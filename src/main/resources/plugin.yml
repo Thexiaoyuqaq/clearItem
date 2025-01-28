@@ -1,9 +1,10 @@
 name: ClearItem
 main: com.mcsyr.clearitem.Main
-softdepend: [PlaceholderAPI]
-version: 3.3.0-SNAPSHOT
-authors: [Luo_ma,KlNon]
+softdepend: [ PlaceholderAPI, My_Worlds ]
+version: ${version}
+authors: [ Luo_ma,KlNon ]
 description: Clear Items in the world and share your items with your friends
+
 commands:
    clearItem:
      aliases: [citem, ci]
@@ -15,19 +16,15 @@ permissions:
     children:
       clearItem.open: true
       clearItem.discard: true
-      clearItem.share: false
       clearItem.drop: true
       clearItem.help: true
       clearItem.Op.Command.type: false
       clearItem.Op.Command.reload: false
       clearItem.Op.Command.PublicClear: false
       clearItem.Op.Command.PublicClean: false
-      clearItem.Op.Command.ShareClean: false
+
   clearItem.open:
     description: open bin
-    default: true
-  clearItem.share:
-    description: open the shared space
     default: true
   clearItem.drop:
     description: stop drop item
@@ -50,7 +47,4 @@ permissions:
     default: op
   clearItem.Op.Command.PublicClean:
     description: clean the PublicInventory
-    default: op
-  clearItem.Op.Command.ShareClean:
-    description: clean the ShareInventory
     default: op

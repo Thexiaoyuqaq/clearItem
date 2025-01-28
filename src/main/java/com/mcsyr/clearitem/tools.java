@@ -1,76 +1,212 @@
 package com.mcsyr.clearitem;
 
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
-import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.entity.Arrow;
-import org.bukkit.entity.Boat;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.ExperienceOrb;
-import org.bukkit.entity.FallingBlock;
-import org.bukkit.entity.Item;
-import org.bukkit.entity.ItemFrame;
-import org.bukkit.entity.Minecart;
-import org.bukkit.entity.Painting;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Snowball;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.entity.*;
+import org.bukkit.scheduler.BukkitTask;
 
 public class tools {
-    public tools() {
+    // 添加常量定义
+    private static final long SCHEDULER_INITIAL_DELAY = 200L;
+    private static final long SCHEDULER_PERIOD = 20L;
+    private static final int BROADCAST_TIME_60 = 60;
+    private static final int BROADCAST_TIME_10 = 10;
+    
+    private static BukkitTask clearItemTask;
+
+    private static final Map<String, Long> performanceMetrics = new HashMap<>();
+
+    private tools() {
+        // 私有构造函数防止实例化
     }
 
     public static void Scheduler() {
-        if (Main.ClearItemTime != 0)
-            Bukkit.getScheduler().runTaskTimerAsynchronously(Main.plugin, () -> {
-                Main.time = Main.time + 1;
-                if (Main.ClearItemTime - Main.time == 60) {
-                    Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClearPre.replace("%time%", "60"));
-                } else if (Main.ClearItemTime - Main.time == 10) {
-                    Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClearPre.replace("%time%", "10"));
-                } else if (Main.ClearItemTime - Main.time <= 0) {
-                    Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClearStart);
-                    tools.clearWorld();
-                    Main.time = 0;
-                    Main.DustbinClearFrequency = Main.DustbinClearFrequency + 1;
-                    if (Main.PublicDustbinEnable && Main.DustbinClearFrequency % Main.PublicDustbinClearInterval == 0) {
-                        Dustbin.ClearDustbin();
-                        Bukkit.getServer().broadcastMessage(Main.PublicDustbinMessageClear);
-                    }
+        if (Main.ClearItemTime != 0) {
+            scheduleClearItemTask();
+        }
+    }
+
+    private static void scheduleClearItemTask() {
+        clearItemTask = Bukkit.getScheduler().runTaskTimerAsynchronously(Main.plugin, () -> {
+            Main.time = Main.time + 1;
+            handleClearItemSchedule();
+        }, SCHEDULER_INITIAL_DELAY, SCHEDULER_PERIOD);
+    }
+
+    private static void handleClearItemSchedule() {
+        int remainingTime = Main.ClearItemTime - Main.time;
+        
+        if (remainingTime == BROADCAST_TIME_60) {
+            broadcastClearWarning(BROADCAST_TIME_60);
+        } else if (remainingTime == BROADCAST_TIME_10) {
+            broadcastClearWarning(BROADCAST_TIME_10);
+        } else if (remainingTime <= 0) {
+            performClearItems();
+        }
+        
+        CheckPlayerDropLock();
+    }
+
+    private static void broadcastClearWarning(int seconds) {
+        Bukkit.getServer().broadcastMessage(
+            Main.ClearItemMessageClearPre.replace("%time%", String.valueOf(seconds)));
+    }
+
+    private static void performClearItems() {
+        Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClearStart);
+        clearWorld();
+        Main.time = 0;
+        Main.DustbinClearFrequency++;
+        
+        if (shouldCleanPublicDustbin()) {
+            cleanPublicDustbin();
+        }
+    }
+
+    private static boolean shouldCleanPublicDustbin() {
+        return Main.PublicDustbinEnable && 
+               Main.DustbinClearFrequency % Main.PublicDustbinClearInterval == 0;
+    }
+
+    public static void CheckPlayerDropLock() {
+        long currentTime = System.currentTimeMillis();
+        
+        for (Player player : Bukkit.getServer().getOnlinePlayers()) {
+            if (!Main.PlayerDropLock.getOrDefault(player, true)) {
+                long lockTime = Main.PlayerDropLockTime.get(player).getTime();
+                if (currentTime - lockTime > Main.DropTime) {
+                    Main.PlayerDropLock.put(player, true);
+                    player.sendMessage(Main.DropMessageOpen);
                 }
-                tools.CheckPlayerDropLock();
-            }, 200L, 20L);
-        if (Main.ShareClearTime != 0)
-            Bukkit.getScheduler().runTaskTimerAsynchronously(Main.plugin, () -> {
-                Main.ShareTime = Main.ShareTime + 1;
-                if (Main.ShareClearTime - Main.ShareTime == 120) {
-                    Bukkit.getServer().broadcastMessage(Main.ShareClearMessagePre.replace("%time%", "120"));
-                } else if (Main.ShareClearTime - Main.ShareTime == 60) {
-                    Bukkit.getServer().broadcastMessage(Main.ShareClearMessagePre.replace("%time%", "60"));
-                } else if (Main.ShareClearTime - Main.ShareTime == 10) {
-                    Bukkit.getServer().broadcastMessage(Main.ShareClearMessagePre.replace("%time%", "10"));
-                } else if (Main.ShareClearTime - Main.ShareTime <= 0) {
-                    Bukkit.getServer().broadcastMessage(Main.ShareClearMessageStart);
-                    Main.ShareTime = 0;
-                    if (Main.ShareEnable) {
-                        Share.ClearShareInv();
-                        TextComponent message = new TextComponent(Main.ShareClearMessageEnd);
-                        TextComponent yes = new TextComponent(Main.ShareButtonMessage);
-                        yes.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citem s"));
-                        yes.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder(Main.ShareButtonInfo).create()));
-                        Player[] players = Bukkit.getServer().getOnlinePlayers().toArray(new Player[0]);
-                        for (Player player : players) {
-                            player.spigot().sendMessage(message, yes);
+            }
+        }
+    }
+
+    public static void clearWorld() {
+        long startTime = System.currentTimeMillis();
+        try {
+            List<World> worlds = Bukkit.getWorlds();
+            for (int i = 0; i < worlds.size(); i++) {
+                final int index = i;
+                Bukkit.getScheduler().runTaskLater(Main.plugin, 
+                    () -> clearWorldItem(worlds.get(index), index == worlds.size() - 1), 
+                    10L * i);
+            }
+        } finally {
+            logPerformance("clearWorld", startTime);
+        }
+    }
+
+    private static void clearWorldItem(World world, boolean isDustbin) {
+        EntityCounter counter = new EntityCounter();
+        
+        // 在主线程中执行实体清理和计数
+        try {
+            for (Entity entity : world.getEntities()) {
+                if (entity instanceof Item) {
+                    Item item = (Item) entity;
+                    if (!Main.ClearItemWhiteList.contains(item.getItemStack().getType().name())) {
+                        if (!Main.BlockBlackList.contains(item.getItemStack().getType().name()) && 
+                            Dustbin.addItem(item.getItemStack())) {
+                            counter.incrementDustbin();
                         }
+                        entity.remove();
+                        counter.incrementTotal();
                     }
+                } else if (shouldClearEntity(entity)) {
+                    entity.remove();
+                    counter.incrementTotal();
                 }
-            }, 200L, 20L);
+            }
+            
+            // 更新统计并发送消息
+            if (counter.getTotal() > 0) {
+                Main.DustbinCount += counter.getDustbinCount();
+                Main.WasteTotal += counter.getTotal();
+                
+                if (!Main.CleaningTipsEnable) {
+                    Bukkit.getScheduler().runTask(Main.plugin, () -> 
+                        broadcastWorldClear(world, counter.getTotal()));
+                }
+            }
+
+            if (isDustbin && Main.CleaningTipsEnable) {
+                Bukkit.getScheduler().runTask(Main.plugin, () ->
+                    broadcastTotalCleared());
+            }
+            
+        } catch (Exception e) {
+            Bukkit.getLogger().warning("Error clearing world items: " + e.getMessage());
+        }
+    }
+
+    private static boolean shouldClearEntity(Entity entity) {
+        return (entity instanceof ItemFrame && Main.ClearItemItemFrame) ||
+               (entity instanceof Boat && Main.ClearItemBoat) ||
+               (entity instanceof ExperienceOrb && Main.ClearItemExpBall) ||
+               (entity instanceof FallingBlock && Main.ClearItemFallingBlock) ||
+               (entity instanceof Painting && Main.ClearItemPainting) ||
+               (entity instanceof Minecart && Main.ClearItemMinecart) ||
+               (entity instanceof Arrow && Main.ClearItemArrow) ||
+               (entity instanceof Snowball && Main.ClearItemSnowball);
+    }
+
+    private static class EntityCounter {
+        private int total = 0;
+        private int dustbinCount = 0;
+        
+        void incrementTotal() { total++; }
+        void incrementDustbin() { dustbinCount++; }
+        int getTotal() { return total; }
+        int getDustbinCount() { return dustbinCount; }
+    }
+
+    private static void handleDustbinCleanup(EntityCounter counter) {
+        Main.DustbinCount += counter.getDustbinCount();
+        Main.WasteTotal += counter.getTotal();
+        
+        if (Main.PublicDustbinEnable) {
+            notifyDustbinStatus();
+        }
+
+        if (Main.CleaningTipsEnable) {
+            broadcastTotalCleared();
+        }
+
+        resetCounters();
+    }
+
+    private static void notifyDustbinStatus() {
+        TextComponent message = new TextComponent(
+            Main.PublicDustbinMessageReminder.replace("%amount%", 
+            String.valueOf(Main.DustbinCount)));
+        TextComponent button = createDustbinButton();
+        
+        for (Player player : Bukkit.getServer().getOnlinePlayers()) {
+            player.spigot().sendMessage(message, button);
+        }
+    }
+
+    private static TextComponent createDustbinButton() {
+        TextComponent button = new TextComponent(Main.PublicDustbinMessageButton);
+        button.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citem open"));
+        button.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
+            new ComponentBuilder(Main.PublicDustbinMessageInfo).create()));
+        return button;
+    }
+
+    private static void resetCounters() {
+        Main.DustbinCount = 0;
+        Main.WasteTotal = 0;
     }
 
     public static void cleanPublicDustbin() {
@@ -80,169 +216,90 @@ public class tools {
         }
     }
 
-    public static void cleanShareInv() {
-        if (Main.ShareEnable) {
-            Share.ClearShareInv();
-            Bukkit.getServer().broadcastMessage(Main.ShareClearMessageEnd);
-        }
-    }
-
-    public static void CheckPlayerDropLock() {
-        long date = (new Date()).getTime();
-        long playerDate;
-
-        for (Player player : Bukkit.getServer().getOnlinePlayers()) {
-            if (!(Boolean) Main.PlayerDropLock.get(player)) {
-                playerDate = Main.PlayerDropLockTime.get(player).getTime();
-                if (date - playerDate > (long) Main.DropTime) {
-                    Main.PlayerDropLock.put(player, true);
-                    player.sendMessage(Main.DropMessageOpen);
-                }
-            }
-        }
-
-    }
-
-    public static void clearWorld() {
-        int index = 0;
-        for (World world : Bukkit.getWorlds()) {
-            final int finalIndex = ++index;
-            Bukkit.getScheduler().runTaskLaterAsynchronously(Main.plugin, () -> tools.clearWorldItem(world, (finalIndex == Bukkit.getWorlds().size())), 10L * index);
-        }
-    }
-
-    public static void clearWorldItem(World world, Boolean isDustbin) {
-        int count = 0;
-        int DustbinCount = 0;
-        List<Entity> Entities = world.getEntities();
-
-        Dustbin.page();
-
-        for (Entity ent : Entities) {
-            if (ent instanceof Item) {
-                Item item = (Item) ent;
-                if (!Main.ClearItemWhiteList.contains(item.getItemStack().getType().name())) {
-                    if (!Main.BlockBlackList.contains(item.getItemStack().getType().name()) && Dustbin.addItem(item.getItemStack())) {
-                        ++DustbinCount;
-                    }
-                    ++count;
-                    ent.remove();
-                }
-            } else if (ent instanceof ItemFrame && Main.ClearItemItemFrame) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof Boat && Main.ClearItemBoat) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof ExperienceOrb && Main.ClearItemExpBall) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof FallingBlock && Main.ClearItemFallingBlock) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof Painting && Main.ClearItemPainting) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof Minecart && Main.ClearItemMinecart) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof Arrow && Main.ClearItemArrow) {
-                ++count;
-                ent.remove();
-            } else if (ent instanceof Snowball && Main.ClearItemSnowball) {
-                ++count;
-                ent.remove();
-            }
-        }
-
-        Main.DustbinCount += DustbinCount;
-        Main.WasteTotal = Main.WasteTotal + count;
-        if (!Main.CleaningTipsEnable && count > 0) {
-            Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClearWorld.replaceAll("%world%", IncludeWorldAlias(world.getName())).replaceAll("%count%", String.valueOf(count)));
-        }
-
-        if (isDustbin) {
-            if (Main.PublicDustbinEnable) {
-                TextComponent message = new TextComponent(Main.PublicDustbinMessageReminder.replace("%amount%", String.valueOf(Main.DustbinCount)));
-                TextComponent yes = new TextComponent(Main.PublicDustbinMessageButton);
-                yes.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/citem open"));
-                yes.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder(Main.PublicDustbinMessageInfo).create()));
-                Player[] players = Bukkit.getServer().getOnlinePlayers().toArray(new Player[0]);
-                for (Player player : players) {
-                    player.spigot().sendMessage(message, yes);
-                }
-            }
-
-            if (Main.CleaningTipsEnable) {
-                Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClear.replaceAll("%count%", String.valueOf(Main.WasteTotal)));
-            }
-
-            Main.DustbinCount = 0;
-            Main.WasteTotal = 0;
-        }
-
-    }
-
-    public static String IncludeWorldAlias(String name) {
-        return Main.Config.getString("CleaningTips.WorldAlias." + name) == null ? name : Main.Config.getString("CleaningTips.WorldAlias." + name);
-    }
-
-    public static void clearEntityItem(Entity ent) {
-        if (ent instanceof Item) {
-            Item item = (Item) ent;
-            if (!Main.ClearItemWhiteList.contains(item.getItemStack().getType().name())) {
-                ent.remove();
-            }
-        } else if (ent instanceof ItemFrame && Main.ClearItemItemFrame) {
-            ent.remove();
-        } else if (ent instanceof Boat && Main.ClearItemBoat) {
-            ent.remove();
-        } else if (ent instanceof ExperienceOrb && Main.ClearItemExpBall) {
-            ent.remove();
-        } else if (ent instanceof FallingBlock && Main.ClearItemFallingBlock) {
-            ent.remove();
-        } else if (ent instanceof Painting && Main.ClearItemPainting) {
-            ent.remove();
-        } else if (ent instanceof Minecart && Main.ClearItemMinecart) {
-            ent.remove();
-        } else if (ent instanceof Arrow && Main.ClearItemArrow) {
-            ent.remove();
-        } else if (ent instanceof Snowball && Main.ClearItemSnowball) {
-            ent.remove();
-        }
-
-    }
-
     public static boolean isIncludedString(List<String> list, String string) {
-        if (string == null) {
+        if (string == null || list == null) {
             return false;
-        } else {
-            Iterator<String> var2 = list.iterator();
-
-            String listString;
-            do {
-                if (!var2.hasNext()) {
-                    return false;
-                }
-
-                listString = var2.next();
-            } while (!string.contains(listString));
-
-            return true;
         }
+        return list.stream().anyMatch(string::contains);
     }
 
     public static void TraversePlayer() {
-
-        for (Player player : Bukkit.getServer().getOnlinePlayers()) {
-            initPlayerData(player);
-        }
-
+        Bukkit.getServer().getOnlinePlayers()
+              .forEach(tools::initPlayerData);
     }
 
     public static void initPlayerData(Player player) {
         Main.PlayerDropLock.putIfAbsent(player, true);
         Main.PlayerDropLockTime.putIfAbsent(player, new Date());
-        Main.PlayerPrivateDustbin.putIfAbsent(player, Bukkit.createInventory(player, Main.PrivateDustbinSize, Main.PrivateDustbinName));
+        Main.PlayerPrivateDustbin.putIfAbsent(player, 
+            Bukkit.createInventory(player, Main.PrivateDustbinSize, Main.PrivateDustbinName));
+    }
+
+    private static void broadcastWorldClear(World world, int count) {
+        Bukkit.getServer().broadcastMessage(
+            Main.ClearItemMessageClearWorld
+                .replaceAll("%world%", IncludeWorldAlias(world.getName()))
+                .replaceAll("%count%", String.valueOf(count)));
+    }
+
+    private static void broadcastTotalCleared() {
+        Bukkit.getServer().broadcastMessage(
+            Main.ClearItemMessageClear.replaceAll("%count%", 
+            String.valueOf(Main.WasteTotal)));
+    }
+
+    public static String IncludeWorldAlias(String name) {
+        return Main.Config.getString("CleaningTips.WorldAlias." + name, name);
+    }
+
+    public static void clearEntityItem(Entity entity) {
+        if (entity instanceof Item) {
+            Item item = (Item) entity;
+            if (!Main.ClearItemWhiteList.contains(item.getItemStack().getType().name())) {
+                if (!Main.BlockBlackList.contains(item.getItemStack().getType().name())) {
+                    Dustbin.addItem(item.getItemStack());
+                }
+                entity.remove();
+            }
+        } else if (shouldClearEntity(entity)) {
+            entity.remove();
+        }
+    }
+
+    public static void cancelTasks() {
+        if (clearItemTask != null) clearItemTask.cancel();
+    }
+
+    public static void logPerformance(String operation, long startTime) {
+        long duration = System.currentTimeMillis() - startTime;
+        performanceMetrics.merge(operation, duration, Long::sum);
+        
+        // 如果操作时间过长，记录警告
+        if (duration > 50) { // 50ms阈值
+            Bukkit.getLogger().warning(String.format(
+                "Operation %s took %dms to complete", 
+                operation, duration));
+        }
+    }
+
+    public static class PerformanceStats {
+        private static final Map<String, Long> totalTime = new HashMap<>();
+        private static final Map<String, Integer> callCount = new HashMap<>();
+        
+        public static void record(String operation, long duration) {
+            synchronized (totalTime) {
+                totalTime.merge(operation, duration, Long::sum);
+                callCount.merge(operation, 1, Integer::sum);
+            }
+        }
+        
+        public static Map<String, Double> getAverages() {
+            Map<String, Double> averages = new HashMap<>();
+            synchronized (totalTime) {
+                totalTime.forEach((op, time) -> 
+                    averages.put(op, (double) time / callCount.get(op)));
+            }
+            return averages;
+        }
     }
 }

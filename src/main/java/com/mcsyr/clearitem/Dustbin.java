@@ -8,11 +8,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 public class Dustbin {
     public static ArrayList<Inventory> DustbinList = new ArrayList<>();
     public static int binSize = 0;
+    private static final Object LOCK = new Object();
+    private static final Map<Material, Integer> itemTypeCount = new HashMap<>();
 
     public Dustbin() {
     }
@@ -45,40 +49,93 @@ public class Dustbin {
         }
     }
 
+    public static void cleanup() {
+        synchronized(LOCK) {
+            DustbinList.forEach(Inventory::clear);
+            DustbinList.clear();
+            itemTypeCount.clear();
+        }
+    }
+
     public static Boolean addItem(ItemStack itemStack) {
-        Main.DustbinLock = true;
-        if (!tools.isIncludedString(Main.PublicDustbinWhiteListName, Objects.requireNonNull(itemStack.getItemMeta()).getDisplayName())) {
-            for (int page = 0; page < binSize; page++) {
-                ItemStack[] contents = DustbinList.get(page).getContents();
+        synchronized(LOCK) {
+            if (!isValidItem(itemStack)) {
+                return false;
+            }
+            
+            // 智能分配策略
+            return distributeItem(itemStack);
+        }
+    }
+    
+    private static boolean distributeItem(ItemStack item) {
+        try {
+            Main.DustbinLock = true;
+            Material material = item.getType();
+            
+            // 更新物品类型计数
+            itemTypeCount.merge(material, item.getAmount(), Integer::sum);
+            
+            // 先尝试合并到现有堆
+            for (Inventory inv : DustbinList) {
+                if (tryMergeItem(inv, item)) {
+                    return true;
+                }
+            }
+            
+            // 如果无法合并，寻找新空位
+            for (Inventory inv : DustbinList) {
+                if (tryAddToEmptySlot(inv, item)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        } finally {
+            Main.DustbinLock = false;
+        }
+    }
 
-                for (int i = 0; i < contents.length; ++i) {
-                    if (contents[i] == null) {
-
-                        DustbinList.get(page).setItem(i, itemStack);
-                        Main.DustbinLock = false;
+    private static boolean tryMergeItem(Inventory inv, ItemStack item) {
+        for (ItemStack content : inv.getContents()) {
+            if (content != null && content.isSimilar(item)) {
+                int remainingSpace = content.getMaxStackSize() - content.getAmount();
+                if (remainingSpace > 0) {
+                    int amountToAdd = Math.min(remainingSpace, item.getAmount());
+                    content.setAmount(content.getAmount() + amountToAdd);
+                    item.setAmount(item.getAmount() - amountToAdd);
+                    
+                    if (item.getAmount() == 0) {
                         return true;
-                    }
-
-                    if (contents[i].isSimilar(itemStack)) {
-                        int remainingQuantity = contents[i].getMaxStackSize() - contents[i].getAmount();
-                        int itemStackAmount = itemStack.getAmount();
-                        if (remainingQuantity > 0) {
-                            if (itemStackAmount <= remainingQuantity) {
-                                contents[i].setAmount(contents[i].getAmount() + itemStackAmount);
-                                DustbinList.get(page).setItem(i, contents[i]);
-                                Main.DustbinLock = false;
-                                return true;
-                            }
-
-                            itemStack.setAmount(itemStackAmount - remainingQuantity);
-                            contents[i].setAmount(contents[i].getAmount() + remainingQuantity);
-                            DustbinList.get(page).setItem(i, contents[i]);
-                        }
                     }
                 }
             }
         }
-        Main.DustbinLock = false;
+        return false;
+    }
+
+    private static boolean tryAddToEmptySlot(Inventory inv, ItemStack item) {
+        int firstEmpty = inv.firstEmpty();
+        if (firstEmpty != -1) {
+            inv.setItem(firstEmpty, item.clone());
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isValidItem(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getItemMeta() == null) {
+            return false;
+        }
+        
+        if (tools.isIncludedString(Main.PublicDustbinWhiteListName, 
+            itemStack.getItemMeta().getDisplayName())) {
+            return false;    
+        }
+        
+        if (!tools.isIncludedString(Main.PublicDustbinWhiteListName, Objects.requireNonNull(itemStack.getItemMeta()).getDisplayName())) {
+            return true;
+        }
         return false;
     }
 
