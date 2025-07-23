@@ -13,16 +13,17 @@ import java.util.Map;
 import java.util.Objects;
 
 public class Dustbin {
-    public static ArrayList<Inventory> DustbinList = new ArrayList<>();
+    public static ArrayList<Inventory> dustbinList = new ArrayList<>();
     public static int binSize = 0;
     private static final Object LOCK = new Object();
     private static final Map<Material, Integer> itemTypeCount = new HashMap<>();
+    public static int pageSize = 0;
 
     public Dustbin() {
     }
 
     public static void page() {
-        for (Inventory inv : DustbinList) {
+        for (Inventory inv : dustbinList) {
             ItemStack prev = new ItemStack(Material.BOOK);
             ItemMeta prevMeta = prev.getItemMeta();
             assert prevMeta != null;
@@ -31,8 +32,8 @@ public class Dustbin {
             prevLore.add(Main.PublicDustbinPrePageDes);
             prevMeta.setLore(prevLore);
             prev.setItemMeta(prevMeta);
-            ItemStack next = new ItemStack(Material.BOOK);
 
+            ItemStack next = new ItemStack(Material.BOOK);
             ItemMeta nextMeta = next.getItemMeta();
             assert nextMeta != null;
             nextMeta.setDisplayName(Main.PublicDustbinNextPageName);
@@ -40,6 +41,7 @@ public class Dustbin {
             nextLore.add(Main.PublicDustbinNextPageDes);
             nextMeta.setLore(nextLore);
             next.setItemMeta(nextMeta);
+
             if (!inv.contains(prev)) {
                 inv.setItem(inv.getSize() - 9, prev);
             }
@@ -51,8 +53,8 @@ public class Dustbin {
 
     public static void cleanup() {
         synchronized(LOCK) {
-            DustbinList.forEach(Inventory::clear);
-            DustbinList.clear();
+            dustbinList.forEach(Inventory::clear);
+            dustbinList.clear();
             itemTypeCount.clear();
         }
     }
@@ -77,14 +79,14 @@ public class Dustbin {
             itemTypeCount.merge(material, item.getAmount(), Integer::sum);
             
             // 先尝试合并到现有堆
-            for (Inventory inv : DustbinList) {
+            for (Inventory inv : dustbinList) {
                 if (tryMergeItem(inv, item)) {
                     return true;
                 }
             }
             
             // 如果无法合并，寻找新空位
-            for (Inventory inv : DustbinList) {
+            for (Inventory inv : dustbinList) {
                 if (tryAddToEmptySlot(inv, item)) {
                     return true;
                 }
@@ -140,28 +142,33 @@ public class Dustbin {
     }
 
     public static void ClearDustbin() {
-        for (Inventory inventory : DustbinList) {
+        for (Inventory inventory : dustbinList) {
             inventory.clear();
         }
     }
 
-    static {
-        int Size = Main.PublicDustbinSize;
-        int PageSize = Size / 54;
-        if (Size > 54) {
-            for (int i = 0; i < PageSize; i++) {
-                DustbinList.add(Bukkit.createInventory((InventoryHolder) null, 54, Main.PublicDustbinName + "第" + (i + 1) + "页"));
+    public static void onInitialize() {
+        dustbinList.clear();
+        int size = Main.PublicDustbinSize;
+        pageSize = size / 54;
+        if (size > 54) {
+            for (int i = 0; i < pageSize; i++) {
+                dustbinList.add(Bukkit.createInventory((InventoryHolder) null, 54, Main.PublicDustbinName + "第" + (i + 1) + "页"));
                 binSize++;
             }
-            if (((Size % 54 + 5) / 9) * 9 != 0) {
-                DustbinList.add(Bukkit.createInventory((InventoryHolder) null, ((Size % 54 + 5) / 9) * 9, Main.PublicDustbinName + "第" + (binSize + 1) + "页"));
+            if (((size % 54 + 5) / 9) * 9 != 0) {
+                dustbinList.add(Bukkit.createInventory((InventoryHolder) null, ((size % 54 + 5) / 9) * 9, Main.PublicDustbinName + "第" + (binSize + 1) + "页"));
                 binSize++;
             }
         } else {
-            DustbinList.add(Bukkit.createInventory((InventoryHolder) null, Size, Main.PublicDustbinName + "第" + 1 + "页"));
+            dustbinList.add(Bukkit.createInventory((InventoryHolder) null, size, Main.PublicDustbinName + "第" + 1 + "页"));
             binSize++;
         }
-        if(PageSize>1)
+        if (pageSize > 1)
             page();
+    }
+
+    static {
+        onInitialize();
     }
 }

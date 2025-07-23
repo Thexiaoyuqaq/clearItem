@@ -9,8 +9,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 
-import static com.mcsyr.clearitem.Dustbin.DustbinList;
-
 /**
  * @author KlNon
  * @version 1.0
@@ -19,16 +17,17 @@ import static com.mcsyr.clearitem.Dustbin.DustbinList;
  * @date 2022/8/23 12:28
  **/
 public class Share {
-    public static ArrayList<Inventory> ShareList = new ArrayList<Inventory>();
+    public static ArrayList<Inventory> shareList = new ArrayList<Inventory>();
 
 
-    public static int ShareLarge=0;
+    public static int shareLarge = 0;
+    public static int pageSize;
 
     public Share() {
     }
 
     public static void page(){
-        for(Inventory inv:ShareList){
+        for(Inventory inv: shareList){
             ItemStack prev = new ItemStack(Material.BOOK);
             ItemMeta prevMeta = prev.getItemMeta();
             assert prevMeta != null;
@@ -37,8 +36,8 @@ public class Share {
             prevLore.add(Main.SharePreInfo);
             prevMeta.setLore(prevLore);
             prev.setItemMeta(prevMeta);
-            ItemStack next = new ItemStack(Material.BOOK);
 
+            ItemStack next = new ItemStack(Material.BOOK);
             ItemMeta nextMeta = next.getItemMeta();
             assert nextMeta != null;
             nextMeta.setDisplayName(Main.ShareNext);
@@ -56,28 +55,33 @@ public class Share {
     }
 
     public static void ClearShareInv() {
-        for (Inventory inventory : ShareList) {
+        for (Inventory inventory : shareList) {
             inventory.clear();
         }
     }
 
-    static {
-        int Size=Main.ShareSize;
-        int PageSize=Size/54;
-        if(Size>54){
-            for(int i = 0; i < PageSize; i++){
-                ShareList.add(Bukkit.createInventory((InventoryHolder) null, 54, Main.ShareName + "第" + (i + 1) + "页"));
-                ShareLarge++;
+    public static void onInitialize() {
+        int size = Main.ShareSize;
+        pageSize = size / 54;
+        if (size > 54) {
+            for (int i = 0; i < pageSize; i++) {
+                shareList.add(Bukkit.createInventory((InventoryHolder) null, 54, Main.ShareName + "第" + (i + 1) + "页"));
+                shareLarge++;
             }
-            if(((Size%54+5)/9)*9!=0){
-                ShareList.add(Bukkit.createInventory((InventoryHolder) null, ((Size%54+5)/9)*9, Main.ShareName + "第" + (ShareLarge + 1) + "页"));
-                ShareLarge++;
+            if (((size%54+5)/9)*9!=0) {
+                shareList.add(Bukkit.createInventory((InventoryHolder) null, ((size%54+5)/9)*9, Main.ShareName + "第" + (shareLarge + 1) + "页"));
+                shareLarge++;
             }
-        }else{
-            ShareList.add(Bukkit.createInventory((InventoryHolder) null, Size, Main.ShareName + "第" + 1 + "页"));
-            ShareLarge++;
+        } else {
+            shareList.add(Bukkit.createInventory((InventoryHolder) null, size, Main.ShareName + "第" + 1 + "页"));
+            shareLarge++;
         }
-        if(PageSize>1)
+        if (pageSize > 1) {
             page();
+        }
+    }
+
+    static {
+        onInitialize();
     }
 }
