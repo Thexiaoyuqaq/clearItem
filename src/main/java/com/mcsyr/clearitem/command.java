@@ -24,11 +24,12 @@ public class command implements TabExecutor {
   private static final String CMD_TYPE = "type";
   private static final String CMD_CLEAR = "publicclear";
   private static final String CMD_CLEAN = "publicclean";
-  
-  private static final String PREFIX = "§8[§bClearItem§8] ";
-  private static final String ERROR = PREFIX + "§c";
-  private static final String SUCCESS = PREFIX + "§a";
-  private static final String INFO = PREFIX + "§7";
+  private static final String CMD_SHARE = "share";
+  private static final String CMD_SHARECLEAN = "shareclean";
+
+  private static final String ERROR = Main.Prefix + "§c";
+  private static final String SUCCESS = Main.Prefix + "§a";
+  private static final String INFO = Main.Prefix + "§7";
 
   @Override
   public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, String[] args) {
@@ -83,9 +84,40 @@ public class command implements TabExecutor {
         return handlePublicCleanCommand(player);
       case CMD_STATS:
         return handleStatsCommand(player);
+      case CMD_SHARE:
+        return handleShareCommand(player);
+      case CMD_SHARECLEAN:
+      case "sclean":
+        return handleShareCleanCommand(player);
       default:
         return false;
     }
+  }
+
+  private boolean handleShareCleanCommand(Player player) {
+    player.sendMessage(INFO + "共享空间按清理中");
+    tools.cleanShare();
+    if (Share.pageSize > 1) {
+      Share.page();
+    }
+    return true;
+  }
+
+  private boolean handleShareCommand(Player player) {
+    if (!Main.ShareEnable) {
+      player.sendMessage(ERROR + "共享空间功能已被禁用!");
+      return true;
+    }
+
+    if (!player.hasPermission("ClearItem.share")) {
+      player.sendMessage(ERROR + "你没有权限使用此命令!");
+      return true;
+    }
+
+    player.openInventory(Share.shareList.getFirst());
+    player.sendMessage(SUCCESS + Main.ShareAction + Main.ShareName);
+
+    return true;
   }
 
   private boolean handleOpenCommand(Player player) {
@@ -99,8 +131,8 @@ public class command implements TabExecutor {
       return true;
     }
     
-    player.openInventory(Dustbin.DustbinList.get(0));
-    player.sendMessage(SUCCESS + "已为你打开" + Main.PublicDustbinName);
+    player.openInventory(Dustbin.dustbinList.getFirst());
+    player.sendMessage(SUCCESS + Main.PublicDustbinAction + Main.PublicDustbinName);
     return true;
   }
 
@@ -119,7 +151,11 @@ public class command implements TabExecutor {
     if (currentState) {
       Main.PlayerDropLock.put(player, false);
       Main.PlayerDropLockTime.put(player, new Date());
-      player.sendMessage(Main.DropMessageClose);
+      if (Main.DropEnableTimer) {
+        player.sendMessage(Main.DropMessageClose.replaceAll("%time%", String.valueOf(Main.DropTime / 1000)));
+      } else {
+        player.sendMessage(Main.DropMessageCloseNoTimer);
+      }
     } else {
       Main.PlayerDropLock.put(player, true);
       player.sendMessage(Main.DropMessageOpen);
@@ -130,7 +166,7 @@ public class command implements TabExecutor {
   private boolean handleDiscardCommand(Player player) {
     if (Main.PrivateDustbinEnable) {
       player.openInventory(Main.PlayerPrivateDustbin.get(player));
-      player.sendMessage("打开了" + Main.PrivateDustbinName);
+      player.sendMessage(Main.PrivateDustbinAction + Main.PrivateDustbinName);
       return true;
     } else {
       player.sendMessage("私人垃圾箱已被服务器禁用!");
@@ -145,6 +181,7 @@ public class command implements TabExecutor {
 
   private boolean handleReloadCommand(Player player) {
     Main.loadConfig();
+    Main.refreshInventories();
     player.sendMessage(SUCCESS + "插件重载成功!");
     return true;
   }
@@ -163,7 +200,9 @@ public class command implements TabExecutor {
   private boolean handlePublicCleanCommand(Player player) {
     player.sendMessage(INFO + "公共垃圾桶清理中");
     tools.cleanPublicDustbin();
-    Dustbin.page();
+    if (Dustbin.pageSize > 1){
+      Dustbin.page();
+    }
     return true;
   }
 
@@ -190,15 +229,15 @@ public class command implements TabExecutor {
       }
       
       int page = Integer.parseInt(arg);
-      int maxPage = Dustbin.DustbinList.size();
+      int maxPage = Dustbin.dustbinList.size();
       
       if (page < 1 || page > maxPage) {
         player.sendMessage(ERROR + "页码范围: 1-" + maxPage);
         return true;
       }
       
-      player.openInventory(Dustbin.DustbinList.get(page - 1));
-      player.sendMessage(SUCCESS + "已打开" + Main.PublicDustbinName + " §7(第" + page + "页)");
+      player.openInventory(Dustbin.dustbinList.get(page - 1));
+      player.sendMessage(SUCCESS + Main.PublicDustbinAction + Main.PublicDustbinName + " §7(第" + page + "页)");
       return true;
     }
     return false;
@@ -214,21 +253,23 @@ public class command implements TabExecutor {
   }
 
   private void showHelp(CommandSender sender) {
-    sender.sendMessage("§8§m                    §r " + PREFIX + " §8§m                    ");
+    sender.sendMessage("§8§m                    §r " + Main.Prefix + " §8§m                    ");
     sender.sendMessage("");
     sender.sendMessage(INFO + "基础命令:");
-    sender.sendMessage("§8- §b/citem open §7(o) [页码] §f打开公共垃圾箱");
-    sender.sendMessage("§8- §b/citem discard §7(d) §f打开私人垃圾箱");
-    sender.sendMessage("§8- §b/citem drop §f切换防丢弃模式");
+    sender.sendMessage("§8- §b/ci open §7(o) [页码] §f打开公共垃圾箱");
+    sender.sendMessage("§8- §b/ci discard §7(d) §f打开私人垃圾箱");
+    sender.sendMessage("§8- §b/ci drop §f切换防丢弃模式");
+    sender.sendMessage("§8- §b/ci share §f打开共享空间");
     
     if (sender.hasPermission("ClearItem.admin")) {
       sender.sendMessage("");
       sender.sendMessage(INFO + "管理命令:");
-      sender.sendMessage("§8- §b/citem type §f查看手持物品类型");
-      sender.sendMessage("§8- §b/citem reload §f重载插件配置");
-      sender.sendMessage("§8- §b/citem stats §f查看性能统计");
-      sender.sendMessage("§8- §b/citem publicclear §7(pclear) §f清理世界掉落物");
-      sender.sendMessage("§8- §b/citem publicclean §7(pclean) §f清空公共垃圾箱");
+      sender.sendMessage("§8- §b/ci type §f查看手持物品类型");
+      sender.sendMessage("§8- §b/ci reload §f重载插件配置");
+      sender.sendMessage("§8- §b/ci stats §f查看性能统计");
+      sender.sendMessage("§8- §b/ci publicclear §7(pclear) §f清理世界掉落物");
+      sender.sendMessage("§8- §b/ci publicclean §7(pclean) §f清空公共垃圾箱");
+      sender.sendMessage("§8- §b/ci shareclean §7(sclean) §f清空公共空间");
     }
     
     sender.sendMessage("");

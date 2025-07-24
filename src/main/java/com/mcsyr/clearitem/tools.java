@@ -37,13 +37,14 @@ public class tools {
 
     private static void scheduleClearItemTask() {
         clearItemTask = Bukkit.getScheduler().runTaskTimerAsynchronously(Main.plugin, () -> {
-            Main.time = Main.time + 1;
+            Main.timer = Main.timer + 1;
+            Main.ShareClearTime = Main.shareClearTimer + 1;
             handleClearItemSchedule();
         }, SCHEDULER_INITIAL_DELAY, SCHEDULER_PERIOD);
     }
 
     private static void handleClearItemSchedule() {
-        int remainingTime = Main.ClearItemTime - Main.time;
+        int remainingTime = Main.ClearItemTime - Main.timer;
         
         if (remainingTime == BROADCAST_TIME_60) {
             broadcastClearWarning(BROADCAST_TIME_60);
@@ -52,8 +53,24 @@ public class tools {
         } else if (remainingTime <= 0) {
             performClearItems();
         }
-        
+
         CheckPlayerDropLock();
+
+        if (Main.ShareEnable) {
+            int remainingShareClearTime = Main.ShareClearTime - Main.shareClearTimer;
+            if (remainingShareClearTime == BROADCAST_TIME_60) {
+                broadcastClearWarning(BROADCAST_TIME_60);
+            }  else if (remainingShareClearTime == BROADCAST_TIME_10) {
+                broadcastClearWarning(BROADCAST_TIME_10);
+            }  else if (remainingShareClearTime <= 0) {
+                performShareClearItems();
+            }
+        }
+    }
+
+    private static void broadcastShareClearWarning(int seconds) {
+        Bukkit.getServer().broadcastMessage(
+                Main.ShareClearMessagePre.replace("%time%", String.valueOf(seconds)));
     }
 
     private static void broadcastClearWarning(int seconds) {
@@ -61,14 +78,22 @@ public class tools {
             Main.ClearItemMessageClearPre.replace("%time%", String.valueOf(seconds)));
     }
 
+    private static void performShareClearItems() {
+        Bukkit.getServer().broadcastMessage(Main.ShareClearMessageStart);
+        Main.shareClearTimer = 0;
+
+        cleanShare();
+    }
+
     private static void performClearItems() {
         Bukkit.getServer().broadcastMessage(Main.ClearItemMessageClearStart);
         clearWorld();
-        Main.time = 0;
+        Main.timer = 0;
         Main.DustbinClearFrequency++;
         
         if (shouldCleanPublicDustbin()) {
             cleanPublicDustbin();
+            Main.DustbinClearFrequency = 0;
         }
     }
 
@@ -83,7 +108,7 @@ public class tools {
         for (Player player : Bukkit.getServer().getOnlinePlayers()) {
             if (!Main.PlayerDropLock.getOrDefault(player, true)) {
                 long lockTime = Main.PlayerDropLockTime.get(player).getTime();
-                if (currentTime - lockTime > Main.DropTime) {
+                if (currentTime - lockTime > Main.DropTime && Main.DropEnableTimer) {
                     Main.PlayerDropLock.put(player, true);
                     player.sendMessage(Main.DropMessageOpen);
                 }
@@ -108,7 +133,9 @@ public class tools {
 
     private static void clearWorldItem(World world, boolean isDustbin) {
         EntityCounter counter = new EntityCounter();
-        
+        if (Dustbin.pageSize > 1) {
+            Dustbin.page();  // 向垃圾桶添加物品前先添加上一页/下一页物品以防止被顶替
+        }
         // 在主线程中执行实体清理和计数
         try {
             for (Entity entity : world.getEntities()) {
@@ -213,6 +240,19 @@ public class tools {
         if (Main.PublicDustbinEnable) {
             Dustbin.ClearDustbin();
             Bukkit.getServer().broadcastMessage(Main.PublicDustbinMessageClear);
+            if (Dustbin.pageSize > 1) {
+                Dustbin.page();
+            }
+        }
+    }
+
+    public static void cleanShare() {
+        if (Main.ShareEnable) {
+            Share.ClearShareInv();
+            Bukkit.getServer().broadcastMessage(Main.ShareClearMessageEnd);
+            if (Share.pageSize > 1) {
+                Share.page();
+            }
         }
     }
 

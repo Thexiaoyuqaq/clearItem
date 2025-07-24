@@ -1,6 +1,10 @@
 # ClearItem - 服务器清理与垃圾箱系统
 # 作者: Luo_ma, KlNon
-# 版本: 3.3.5
+# 版本: 3.3.5.1
+
+
+# 部分指令提示前缀
+Prefix: "§8[§bClearItem§8] "
 
 # ======================== #
 #      公共垃圾箱系统      #
@@ -46,6 +50,7 @@ PublicDustbin:
 PrivateDustbin:
   Enable: true
   Name: "&3&l个人垃圾箱 &8(&7物品会自动转移至公共垃圾箱&8)"
+  Action: "&b&l>> &f打开了"
   Size: 54
   
   # 物品保护(这些物品不会被转移)
@@ -64,13 +69,52 @@ PrivateDustbin:
 # 防止玩家误丢重要物品的保护机制
 Drop:
   Enable: true
+  # 是否启用重新锁定
+  EnableTimer: false
   # 解锁后自动重新锁定时间(秒)
   Time: 300
   
   Message:
     Open: "&8[&a✓&8] &f已开启物品保护"
     Close: "&8[&c✗&8] &7已临时关闭物品保护 &8(&f%time%秒后恢复&8)"
+    CloseNoTimer: "&8[&c✗&8] &7已临时关闭物品保护"
     DiscardInOpen: "&8[&e!&8] &f物品保护已开启&7, &f输入 &e/citem drop &f临时解除"
+
+
+# ======================== #
+#      共享物品空间      #
+# ======================== #
+ShareInv:
+  Enable: true
+  # 箱子名称
+  Name: "&3&l共享空间"
+  # 箱大小
+  Size: 54
+  # 打开动作
+  Action: "&b打开了"
+  # 上一页页码的文字
+  PrePageName: "&9上一页"
+  # 上一页页码的描述
+  PrePageDes: "&9点此上一页"
+  # 下一页页码的文字
+  NextPageName: "&9下一页"
+  # 下一页页码的描述
+  NextPageDes: "&9点此下一页"
+  #  清理时间(默认10分钟，单位秒)
+  ClearTime: 600
+  # 清理前的消息
+  Message:
+    ClearMessagePre:
+      "&c[警告] &6共享空间将会在 &e%time%秒 &6后清理，请及时取走重要物品!"
+    ClearMessageStart:
+      "&c[警告] &6共享空间正在清理. 注意安全!"
+    ClearMessageEnd:
+      "&c[警告] &6共享空间清理完毕!"
+    ButtonMessage:
+      "点此打开共享空间"
+    ButtonInfo:
+      "这是一个共享空间"
+
 
 # ======================== #
 #      掉落物清理系统      #

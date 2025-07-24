@@ -1,13 +1,7 @@
 package com.mcsyr.clearitem;
 
 import java.text.DecimalFormat;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Collection;
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import me.clip.placeholderapi.PlaceholderAPI;
@@ -289,20 +283,49 @@ public class Event implements Listener {
   
   private void handleInventoryClick(InventoryClickEvent event) {
     String title = event.getView().getTitle();
-    
-    if (isDustbinLocked(title)) {
-      handleDustbinLockClick(event);
+
+    if (title.contains(Main.PublicDustbinName)) {
+        handleDustbinClick(event, isDustbinLocked(title));
+    } else if (title.contains(Main.ShareName)) {
+      handleShareClick(event);
     } else if (isPrivateDustbin(title)) {
-      handlePrivateDustbinClick(event, event.getCurrentItem());
+      handlePrivateDustbinClick(event, Objects.requireNonNull(event.getCurrentItem()));
     }
   }
-  
+
+  private void handleShareClick(InventoryClickEvent event) {
+    if(Objects.requireNonNull(event.getCurrentItem()).hasItemMeta() && Objects.requireNonNull(event.getCurrentItem().getItemMeta()).hasDisplayName()){
+      if(event.getCurrentItem().getItemMeta().getDisplayName().equals(Main.SharePre)){
+        event.setCancelled(true);
+        int count=Integer.parseInt(event.getView().getTitle().substring(event.getView().getTitle().length()-2,event.getView().getTitle().length()-1))-1;
+        if(count>0){
+          count--;
+        }else {
+          count=Share.shareList.size()-1;
+        }
+        Player player = (Player) event.getWhoClicked();
+        player.closeInventory();
+        player.openInventory(Share.shareList.get(count));
+      }else if(event.getCurrentItem().getItemMeta().getDisplayName().equals(Main.ShareNext)){
+        event.setCancelled(true);
+        int count=Integer.parseInt(event.getView().getTitle().substring(event.getView().getTitle().length()-2,event.getView().getTitle().length()-1))-1;
+        if(count<Share.shareList.size()-1){
+          count++;
+        }else
+          count=0;
+        Player player = (Player) event.getWhoClicked();
+        player.closeInventory();
+        player.openInventory(Share.shareList.get(count));
+      }
+    }
+  }
+
   private boolean isDustbinLocked(String title) {
-    return title.equals(Main.PublicDustbinName) && Main.DustbinLock;
+    return title.contains(Main.PublicDustbinName) && Main.DustbinLock;
   }
   
   private boolean isPrivateDustbin(String title) {
-    return Main.DropEnable && title.equals(Main.PrivateDustbinName);
+    return Main.DropEnable && title.contains(Main.PrivateDustbinName);
   }
 
   @EventHandler
@@ -370,9 +393,36 @@ public class Event implements Listener {
     player.sendMessage(message);
   }
 
-  private void handleDustbinLockClick(InventoryClickEvent event) {
-    event.getWhoClicked().sendMessage(Main.PublicDustbinName + "垃圾箱已被锁住，请稍等1秒后操作...");
-    event.setCancelled(true);
+  private void handleDustbinClick(InventoryClickEvent event, boolean locked) {
+    if (locked) {
+      event.getWhoClicked().sendMessage(Main.PublicDustbinName + "垃圾箱已被锁住，请稍等1秒后操作...");
+      event.setCancelled(true);
+    } else {
+      if(Objects.requireNonNull(event.getCurrentItem()).hasItemMeta() && Objects.requireNonNull(event.getCurrentItem().getItemMeta()).hasDisplayName()){
+        if(event.getCurrentItem().getItemMeta().getDisplayName().equals(Main.PublicDustbinPrePageName)){
+          event.setCancelled(true);
+          int count=Integer.parseInt(event.getView().getTitle().substring(event.getView().getTitle().length()-2,event.getView().getTitle().length()-1))-1;
+          if(count>0){
+            count--;
+          }else {
+            count=Dustbin.dustbinList.size()-1;
+          }
+          Player player = (Player) event.getWhoClicked();
+          player.closeInventory();
+          player.openInventory(Dustbin.dustbinList.get(count));
+        }else if(event.getCurrentItem().getItemMeta().getDisplayName().equals(Main.PublicDustbinNextPageName)){
+          event.setCancelled(true);
+          int count=Integer.parseInt(event.getView().getTitle().substring(event.getView().getTitle().length()-2,event.getView().getTitle().length()-1))-1;
+          if(count<Dustbin.dustbinList.size()-1){
+            count++;
+          }else
+            count=0;
+          Player player = (Player) event.getWhoClicked();
+          player.closeInventory();
+          player.openInventory(Dustbin.dustbinList.get(count));
+        }
+      }
+    }
   }
 
   private void handlePrivateDustbinClick(InventoryClickEvent event, ItemStack itemStack) {
