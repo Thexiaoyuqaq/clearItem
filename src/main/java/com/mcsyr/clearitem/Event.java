@@ -58,7 +58,7 @@ public class Event implements Listener {
           }
       });
 
-  private class PredictionSystem {
+  private static class PredictionSystem {
     private final Map<String, Double> chunkProbability = new HashMap<>();
     
     public void updateProbability(String chunkKey, boolean wasCleared) {
@@ -172,7 +172,7 @@ public class Event implements Listener {
     }
     
     // 检查物品密度
-    double density = itemCount / (NEARBY_RADIUS_X * NEARBY_RADIUS_Y * NEARBY_RADIUS_Z);
+    double density = (double) itemCount / (NEARBY_RADIUS_X * NEARBY_RADIUS_Y * NEARBY_RADIUS_Z);
     if (density > ITEM_DENSITY_THRESHOLD) {
       return true;
     }
@@ -471,7 +471,7 @@ public class Event implements Listener {
     String message = Main.ClearItemMessageClearChunkMaxItems
         .replace("%world%", "%myworlds_world_alias%");
     
-    if (nearestPlayer != null) {
+    if (nearestPlayer != null && Main.PlaceholderStatus) {
       message = PlaceholderAPI.setPlaceholders(nearestPlayer, message);
     }
     

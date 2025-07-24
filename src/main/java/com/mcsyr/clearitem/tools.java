@@ -1,9 +1,6 @@
 package com.mcsyr.clearitem;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
 
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
@@ -59,9 +56,9 @@ public class tools {
         if (Main.ShareEnable) {
             int remainingShareClearTime = Main.ShareClearTime - Main.shareClearTimer;
             if (remainingShareClearTime == BROADCAST_TIME_60) {
-                broadcastClearWarning(BROADCAST_TIME_60);
+                broadcastShareClearWarning(BROADCAST_TIME_60);
             }  else if (remainingShareClearTime == BROADCAST_TIME_10) {
-                broadcastClearWarning(BROADCAST_TIME_10);
+                broadcastShareClearWarning(BROADCAST_TIME_10);
             }  else if (remainingShareClearTime <= 0) {
                 performShareClearItems();
             }
@@ -157,18 +154,22 @@ public class tools {
             
             // 更新统计并发送消息
             if (counter.getTotal() > 0) {
-                Main.DustbinCount += counter.getDustbinCount();
-                Main.WasteTotal += counter.getTotal();
+                Main.DustbinCount = counter.getDustbinCount();  // ↓
+                Main.WasteTotal = counter.getTotal();  // modify: 对于清理计数提示，没必要进行数字累计增加
                 
                 if (!Main.CleaningTipsEnable) {
-                    Bukkit.getScheduler().runTask(Main.plugin, () -> 
-                        broadcastWorldClear(world, counter.getTotal()));
+                    Bukkit.getScheduler().runTask(Main.plugin, () -> {
+                        broadcastWorldClear(world, counter.getTotal());
+                        notifyDustbinStatus();
+                    });
                 }
             }
 
             if (isDustbin && Main.CleaningTipsEnable) {
-                Bukkit.getScheduler().runTask(Main.plugin, () ->
-                    broadcastTotalCleared());
+                Bukkit.getScheduler().runTask(Main.plugin, () -> {
+                    broadcastTotalCleared();
+                    notifyDustbinStatus();
+                });
             }
             
         } catch (Exception e) {
@@ -197,21 +198,6 @@ public class tools {
         int getDustbinCount() { return dustbinCount; }
     }
 
-    private static void handleDustbinCleanup(EntityCounter counter) {
-        Main.DustbinCount += counter.getDustbinCount();
-        Main.WasteTotal += counter.getTotal();
-        
-        if (Main.PublicDustbinEnable) {
-            notifyDustbinStatus();
-        }
-
-        if (Main.CleaningTipsEnable) {
-            broadcastTotalCleared();
-        }
-
-        resetCounters();
-    }
-
     private static void notifyDustbinStatus() {
         TextComponent message = new TextComponent(
             Main.PublicDustbinMessageReminder.replace("%amount%", 
@@ -229,11 +215,6 @@ public class tools {
         button.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
             new ComponentBuilder(Main.PublicDustbinMessageInfo).create()));
         return button;
-    }
-
-    private static void resetCounters() {
-        Main.DustbinCount = 0;
-        Main.WasteTotal = 0;
     }
 
     public static void cleanPublicDustbin() {
@@ -280,12 +261,14 @@ public class tools {
             Main.ClearItemMessageClearWorld
                 .replaceAll("%world%", IncludeWorldAlias(world.getName()))
                 .replaceAll("%count%", String.valueOf(count)));
+
     }
 
     private static void broadcastTotalCleared() {
         Bukkit.getServer().broadcastMessage(
             Main.ClearItemMessageClear.replaceAll("%count%", 
             String.valueOf(Main.WasteTotal)));
+        Main.WasteTotal = 0;
     }
 
     public static String IncludeWorldAlias(String name) {
