@@ -152,6 +152,8 @@ public class Main extends JavaPlugin {
 
   public static String ShareButtonInfo;
 
+  public static Boolean PlaceholderStatus;
+
   public static String Version = "3.3.5.1";
 
   public static List<String> Arg1_TabCommand = new ArrayList<>(Arrays.asList("open", "discard", "drop", "share"));
@@ -258,6 +260,12 @@ public class Main extends JavaPlugin {
     ShareClearMessageEnd = Objects.requireNonNull(Config.getString("ShareInv.Message.ClearMessageEnd")).replaceAll("&", "§");
     ShareButtonMessage = Objects.requireNonNull(Config.getString("ShareInv.Message.ButtonMessage")).replaceAll("&", "§");
     ShareButtonInfo = Objects.requireNonNull(Config.getString("ShareInv.Message.ButtonInfo")).replaceAll("&", "§");
+    try {
+      Class.forName("me.clip.placeholderapi.PlaceholderAPI");
+      PlaceholderStatus = true;
+    } catch (ClassNotFoundException e) {
+      PlaceholderStatus = false;
+    }
   }
 
   public static void refreshInventories() {
